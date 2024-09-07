@@ -153,7 +153,7 @@ jobs:
         echo "Cleaned up custom-wheels directory"
 ```
 
-4. Pastikan untuk menambahkan secret berikut di pengaturan repositori GitHub Anda:
+4. Pastikan untuk menambahkan secret berikut di pengaturan repositori GitHub Anda (repository setting > secrets and variables > actions > repository secrets):
    - `PWS_URL`: `https://<username>:<projectpassword>@pbp.cs.ui.ac.id/<username>/<projectname>`
 
 ## Menangani Konflik
