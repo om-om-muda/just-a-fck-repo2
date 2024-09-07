@@ -36,35 +36,35 @@ jobs:
         git config user.name github-actions
         git config user.email github-actions@github.com
 
-    - name: Check PWS remote, push, and handle branch
-      run: |
-
-        PWS_URL="http://isa_citra:_8AmVGOjXGjNfZWm6_G751B6qAgCW7jF@pbp.cs.ui.ac.id/isa_citra/elf"
-        if git remote | grep -q "^pws$"; then
-          echo "PWS remote exists. Updating URL."
-          git remote set-url pws "$PWS_URL"
-        else
-          echo "PWS remote does not exist. Adding it."
-          git remote add pws "$PWS_URL"
-        fi
-        
-        git add .
-        git commit -m "Add installed dependencies and custom wheels" || echo "No changes to commit"
-        
-        # Check if master branch exists locally
-        if git show-ref --verify --quiet refs/heads/master; then
-          echo "Master branch exists locally"
-        else
-          echo "Creating master branch"
-          git branch master
-        fi
-        
-        # Push to master branch
-        git push pws HEAD:master
-      env:
-        GIT_TERMINAL_PROMPT: 0
-        GIT_ASKPASS: /bin/echo
-        GIT_PASSWORD: ${{ secrets.PWS_PASSWORD }}
+        - name: Check PWS remote, push, and handle branch
+        run: |
+          # Set up credential helper
+          git config --global credential.helper store
+          echo "http://${{ secrets.PWS_USERNAME }}:${{ secrets.PWS_PASSWORD }}@pbp.cs.ui.ac.id" > ~/.git-credentials
+          cat ~/.git-credentials
+          PWS_URL="http://pbp.cs.ui.ac.id/isa.citra/elf"
+          if git remote | grep -q "^pws$"; then
+            echo "PWS remote exists. Updating URL."
+            git remote set-url pws "$PWS_URL"
+          else
+            echo "PWS remote does not exist. Adding it."
+            git remote add pws "$PWS_URL"
+          fi
+          
+          git add .
+          git commit -m "Add installed dependencies and custom wheels" || echo "No changes to commit"
+          
+          # Check if master branch exists locally
+          if git show-ref --verify --quiet refs/heads/master; then
+            echo "Master branch exists locally"
+          else
+            echo "Creating master branch"
+            git branch master
+          fi
+          
+          # Push to master branch
+          git push pws master || echo "Push failed"
+      
 
     - name: Clean up credentials
       if: always()
