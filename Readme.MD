@@ -154,7 +154,7 @@ jobs:
 ```
 
 4. Pastikan untuk menambahkan secret berikut di pengaturan repositori GitHub Anda (repository setting > secrets and variables > actions > repository secrets):
-   - `PWS_URL`: `https://<username>:<projectpassword>@pbp.cs.ui.ac.id/<username>/<projectname>`
+   - `PWS_URL`: `https://<usernamepws>:<pwsprojectpassword>@pbp.cs.ui.ac.id/<usernamepws>/<pwsprojectname>`
 
 ## Menangani Konflik
 
