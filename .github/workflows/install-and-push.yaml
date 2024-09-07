@@ -59,8 +59,9 @@ jobs:
           git branch master
         fi
         
-        # Push to master branch
-        git push pws master || echo "Push failed"
+        # Push to master branch and capture the output
+        push_output=$(git push pws master 2>&1) || { echo "Push failed with output: $push_output"; exit 1; }
+        echo "Push successful with output: $push_output"
 
     - name: Clean up credentials
       if: always()
