@@ -1,6 +1,6 @@
 # Django Project CI/CD Setup Guide
 
-Panduan ini akan membantu Anda menyiapkan Continuous Integration dan Continuous Deployment (CI/CD) untuk proyek Django Anda, menggunakan GitHub Actions untuk push otomatis ke PWS (Pengembangan Web Skala Besar).
+Panduan ini akan membantu Anda menyiapkan Continuous Integration dan Continuous Deployment (CI/CD) untuk proyek Django Anda, menggunakan GitHub Actions untuk push otomatis ke PWS (Pacil Web Service).
 
 ## Daftar Isi
 1. [Persiapan Proyek](#persiapan-proyek)
@@ -23,6 +23,7 @@ Sebelum memulai, pastikan Anda memiliki:
 2. Salin kode berikut ke dalam `Dockerfile`:
 
 ```dockerfile
+FROM python:3.10-slim-buster
 FROM python:3.10-slim-buster
 
 WORKDIR /app
@@ -154,8 +155,8 @@ jobs:
         echo "Cleaned up custom-wheels directory"
 ```
 
-4. Pastikan untuk menambahkan secret berikut di pengaturan repositori GitHub Anda:
-   - `PWS_URL`: URL `https://<username>:<projectpassword>@pbp.cs.ui.ac.id/<username>/<projectname>`
+4. Pastikan untuk menambahkan secret berikut di pengaturan repositori GitHub Anda (repository setting > secrets and variables > actions > repository secrets):
+   - `PWS_URL`: `https://<usernamepws>:<pwsprojectpassword>@pbp.cs.ui.ac.id/<usernamepws>/<pwsprojectname>`
 
 ## Menangani Konflik
 
