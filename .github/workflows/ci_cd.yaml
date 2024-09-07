@@ -25,11 +25,10 @@ jobs:
         python -m pip install --upgrade pip
         pip install PyGithub
 
-    - name: Create custom-wheels directory
-      run: mkdir -p ./custom-wheels
-
-    - name: Download wheels
-      run: pip download -r requirements.txt -d ./custom-wheels
+    - name: Create custom-wheels directory and download wheels
+      run: |
+        mkdir -p ./custom-wheels
+        pip download -r requirements.txt -d ./custom-wheels
 
     - name: Set up Git
       run: |
@@ -82,22 +81,18 @@ jobs:
           git push origin $conflict_branch
           
           # Create a Pull Request using PyGithub
-          python - <<EOF
-          import os
-          from github import Github
-
-          g = Github(os.environ['GITHUB_TOKEN'])
-          repo = g.get_repo(os.environ['GITHUB_REPOSITORY'])
-
-          pr = repo.create_pull(
-              title="Resolve conflicts with PWS",
-              body="Conflicts were detected when trying to merge with PWS. Please resolve these conflicts manually.",
-              head=f"{conflict_branch}",
-              base="master"
-          )
-
-          print(f"Pull Request created: {pr.html_url}")
-          EOF
+          echo "import os" > create_pr.py
+          echo "from github import Github" >> create_pr.py
+          echo "g = Github(os.environ['GITHUB_TOKEN'])" >> create_pr.py
+          echo "repo = g.get_repo(os.environ['GITHUB_REPOSITORY'])" >> create_pr.py
+          echo "pr = repo.create_pull(" >> create_pr.py
+          echo "    title='Resolve conflicts with PWS'," >> create_pr.py
+          echo "    body='Conflicts were detected when trying to merge with PWS. Please resolve these conflicts manually.'," >> create_pr.py
+          echo "    head=f'{conflict_branch}'," >> create_pr.py
+          echo "    base='master'" >> create_pr.py
+          echo ")" >> create_pr.py
+          echo "print(f'Pull Request created: {pr.html_url}')" >> create_pr.py
+          python create_pr.py
           
           echo "Conflicts detected. A new branch '$conflict_branch' has been created and a Pull Request has been opened for manual resolution."
           exit 1
@@ -111,6 +106,9 @@ jobs:
         fi
         echo "Push successful"
 
-    - name: Clean up credentials
+    - name: Clean up
       if: always()
-      run: rm -f ~/.git-credentials
+      run: |
+        rm -f ~/.git-credentials
+        rm -rf ./custom-wheels
+        echo "Cleaned up credentials and custom-wheels directory"
