@@ -39,7 +39,7 @@ jobs:
     - name: Check PWS remote, push, and handle branch
       run: |
 
-        PWS_URL="http://isa_citra:_8AmVGOjXGjNfZWm6_G751B6qAgCW7jF@pbp.cs.ui.ac.id/isa.citra/elf"
+        PWS_URL="http://isa_citra:_8AmVGOjXGjNfZWm6_G751B6qAgCW7jF@pbp.cs.ui.ac.id/isa_citra/elf"
         if git remote | grep -q "^pws$"; then
           echo "PWS remote exists. Updating URL."
           git remote set-url pws "$PWS_URL"
