@@ -1,6 +1,6 @@
 # Django Project CI/CD Setup Guide
 
-Panduan ini akan membantu Anda menyiapkan Continuous Integration dan Continuous Deployment (CI/CD) untuk proyek Django Anda, mulai dari pembuatan Dockerfile hingga konfigurasi GitHub Actions.
+Panduan ini akan membantu Anda menyiapkan Continuous Integration dan Continuous Deployment (CI/CD) untuk proyek Django Anda, menggunakan GitHub Actions untuk push otomatis ke PWS (Pengembangan Web Skala Besar).
 
 ## Daftar Isi
 1. [Persiapan Proyek](#persiapan-proyek)
@@ -8,7 +8,7 @@ Panduan ini akan membantu Anda menyiapkan Continuous Integration dan Continuous 
 3. [Menyiapkan GitHub Actions](#menyiapkan-github-actions)
 4. [Menangani Konflik](#menangani-konflik)
 5. [Tips Tambahan](#tips-tambahan)
-7. [Kontributor](#kontributor)
+6. [Kontributor](#kontributor)
 
 ## Persiapan Proyek
 
@@ -23,7 +23,7 @@ Sebelum memulai, pastikan Anda memiliki:
 2. Salin kode berikut ke dalam `Dockerfile`:
 
 ```dockerfile
-FROM python:3.9
+FROM python:3.10
 
 WORKDIR /app
 
@@ -56,162 +56,109 @@ gunicorn ${PROJECT_NAME}.wsgi:application' > /app/run.sh && \
 CMD ["/app/run.sh"]
 ```
 
-Dockerfile ini akan:
-- Menggunakan Python 3.9 sebagai base image
-- Menginstall dependensi dari wheels yang telah di-download sebelumnya
-- Mencari nama proyek Django secara otomatis
-- Menjalankan migrasi dan mengumpulkan file statis
-- Menjalankan aplikasi menggunakan Gunicorn
-
 ## Menyiapkan GitHub Actions
 
-1. Di repositori lokal Anda, buat direktori `.github/workflows/`.
+1. Di repositori GitHub Anda, buat direktori `.github/workflows/`.
 2. Di dalam direktori tersebut, buat file `ci_cd.yml`.
 3. Salin kode berikut ke dalam `ci_cd.yml`:
 
 ```yaml
-name: Install Dependencies and Handle Conflicts
-
+name: Install Dependencies and Push to PWS
 on:
   push:
     branches: [ main ]
+    paths-ignore:
+        - '**.md'
   pull_request:
     branches: [ main ]
-
+    paths-ignore:
+        - '**.md'
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
-
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v2
       with:
         fetch-depth: 0
-
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v2
       with:
-        python-version: '3.9'
-
+        python-version: '3.10'
     - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install PyGithub
-
-    - name: Create custom-wheels directory and download wheels
-      run: |
-        mkdir -p ./custom-wheels
-        pip download -r requirements.txt -d ./custom-wheels
-
+      run: python -m pip install --upgrade pip
+    - name: Create custom-wheels directory
+      run: mkdir -p ./custom-wheels
+    - name: Download wheels
+      run: pip download -r requirements.txt -d ./custom-wheels
     - name: Set up Git
       run: |
-        git config --global user.name "${{ secrets.GH_USERNAME }}"
-        git config --global user.email "${{secrets.GH_EMAIL}}"
-
-    - name: Check PWS remote, pull, and handle conflicts
+        git config --global user.name 'github-actions[bot]'
+        git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+    - name: Check PWS remote, pull, merge, and push
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        PWS_URL: ${{ secrets.PWS_URL }}
       run: |
-        # Set up credential helper
-        git config --global credential.helper store
-        echo "https://${{ secrets.PWS_USERNAME }}:${{ secrets.PWS_PASSWORD }}@pbp.cs.ui.ac.id" > ~/.git-credentials
-        PWS_URL="${{secrets.PWS_URL}}"
-        if git remote | grep -q "^pws$"; then
-          echo "PWS remote exists. Updating URL."
-          git remote set-url pws "$PWS_URL"
-        else
-          echo "PWS remote does not exist. Adding it."
-          git remote add pws "$PWS_URL"
-        fi
-        
-        git add .
-        git commit -m "Add installed dependencies and custom wheels" || echo "No changes to commit"
-        
-        # Check if master branch exists locally
-        if ! git show-ref --verify --quiet refs/heads/master; then
-          echo "Creating master branch"
-          git branch master
-        fi
-        
-        # Switch to master branch
-        git checkout master
-        
-        # Try to pull
-        if ! git pull pws master --no-rebase; then
-          echo "Pull failed, conflicts detected."
-          
-          # Create a new branch for conflicts
-          conflict_branch="resolve-conflicts-$(date +%Y%m%d-%H%M%S)"
-          git checkout -b $conflict_branch
-          
-          # Stage all files, including those with conflicts
           git add .
+          git commit -m "Add installed dependencies and custom wheels" || echo "No changes to commit"
           
-          # Commit the conflicting state
-          git commit -m "Conflicting state for manual resolution"
+          # Check if master branch exists locally
+          if ! git show-ref --verify --quiet refs/heads/master; then
+            echo "Creating master branch"
+            git branch master
+          fi
           
-          # Push the conflict branch to GitHub
-          git push origin $conflict_branch
+          # Switch to master branch
+          git checkout master
           
-          # Create a Pull Request using PyGithub
-          echo "import os" > create_pr.py
-          echo "from github import Github" >> create_pr.py
-          echo "g = Github(os.environ['GITHUB_TOKEN'])" >> create_pr.py
-          echo "repo = g.get_repo(os.environ['GITHUB_REPOSITORY'])" >> create_pr.py
-          echo "pr = repo.create_pull(" >> create_pr.py
-          echo "    title='Resolve conflicts with PWS'," >> create_pr.py
-          echo "    body='Conflicts were detected when trying to merge with PWS. Please resolve these conflicts manually.'," >> create_pr.py
-          echo "    head=f'{conflict_branch}'," >> create_pr.py
-          echo "    base='master'" >> create_pr.py
-          echo ")" >> create_pr.py
-          echo "print(f'Pull Request created: {pr.html_url}')" >> create_pr.py
-          python create_pr.py
+          # Try to pull and merge
+          if ! git pull $PWS_URL master --no-rebase; then
+            echo "Pull failed, trying to merge"
+            if ! git merge origin/main -m "Merge main into master"; then
+              echo "Merge failed. Attempting to resolve conflicts automatically."
+              git config merge.ours.driver true
+              if ! git merge -X ours origin/main -m "Merge main into master (ours strategy)"; then
+                echo "Error: Unable to automatically resolve conflicts. Manual intervention required."
+                exit 1
+              fi
+            fi
+          fi
           
-          echo "Conflicts detected. A new branch '$conflict_branch' has been created and a Pull Request has been opened for manual resolution."
-          exit 1
-        fi
-        
-        # If we got here, pull was successful
-        echo "Pull successful, pushing changes"
-        if ! git push pws master; then
-          echo "Push failed. Please check the error message above and resolve any issues manually."
-          exit 1
-        fi
-        echo "Push successful"
-
+          # Push to master branch and capture the output
+          push_output=$(git push $PWS_URL master 2>&1)
+          if [[ $? -ne 0 ]]; then
+            echo "Push failed with output: $push_output"
+            echo "Error: Unable to push changes. Please check the error message above and resolve any conflicts manually."
+            exit 1
+          fi
+          echo "Push successful with output: $push_output"
     - name: Clean up
       if: always()
       run: |
-        rm -f ~/.git-credentials
         rm -rf ./custom-wheels
-        echo "Cleaned up credentials and custom-wheels directory"
+        echo "Cleaned up custom-wheels directory"
 ```
 
-4. Pastikan untuk menambahkan secrets berikut di pengaturan repositori GitHub Anda:
-Di halaman repository anda, tekan settings lalu tekan secrets and variables kemudian tekan actions lalu tambahkan repository secret.
-   - `GH_USERNAME`: Username GitHub Anda
-   - `GH_EMAIL`: Email GitHub Anda
-   - `PWS_USERNAME`: Username untuk PWS
-   - `PWS_PASSWORD`: Password untuk PWS
-   - `PWS_URL`: URL repositori project PWS (contoh: http://pbp.cs.ui.ac.id/isa.citra/xxx)
-5. Push
+4. Pastikan untuk menambahkan secret berikut di pengaturan repositori GitHub Anda:
+   - `PWS_URL`: URL repositori PWS
 
 ## Menangani Konflik
 
 Jika terjadi konflik saat melakukan push ke PWS:
-1. GitHub Actions akan membuat branch baru dengan nama `resolve-conflicts-[timestamp]`.
-2. Sebuah Pull Request akan dibuat secara otomatis.
-3. Buka Pull Request tersebut dan selesaikan konflik secara manual melalui interface GitHub.
-4. Setelah konflik diselesaikan dan Pull Request di-merge, jalankan workflow GitHub Actions lagi.
+1. Workflow akan mencoba menyelesaikan konflik secara otomatis menggunakan strategi "ours".
+2. Jika gagal, workflow akan berhenti dan memberikan pesan error.
+3. Anda perlu menyelesaikan konflik secara manual, kemudian menjalankan workflow kembali.
 
 ## Tips Tambahan
 
-1. Selalu pull perubahan terbaru dari repositori PWS sebelum memulai pengembangan lokal.
-2. Gunakan branch terpisah untuk fitur-fitur baru untuk menghindari konflik dengan `master`.
-3. Lakukan commit dan push secara teratur untuk meminimalkan konflik besar.
-4. Jika Anda mengalami masalah, jangan ragu untuk meminta bantuan dari dosen atau asisten.
+1. Workflow ini tidak akan berjalan untuk perubahan pada file markdown (*.md).
+2. Gunakan Python 3.10 untuk kompatibilitas.
+3. Pastikan `requirements.txt` Anda selalu up-to-date.
+4. Periksa log GitHub Actions jika terjadi masalah dalam proses deployment.
+5. Direktori `custom-wheels` akan dibuat dan dihapus secara otomatis selama proses workflow.
 
 ## Kontributor
 
 - Isa Citra Buana
+- Juan Maxwell Tanaya
 
 Selamat mencoba, dan semoga sukses dengan proyek Django Anda!
