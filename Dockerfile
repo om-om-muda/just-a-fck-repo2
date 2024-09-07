@@ -37,6 +37,7 @@ if [ -z "$PROJECT_NAME" ]; then\n\
 fi\n\
 echo "Django project name: ${PROJECT_NAME}"\n\
 export DJANGO_SETTINGS_MODULE=${PROJECT_NAME}.settings\n\
+python manage.py makemigrations\n\
 python manage.py migrate\n\
 python manage.py collectstatic --noinput\n\
 gunicorn ${PROJECT_NAME}.wsgi:application' > /app/run.sh && \

@@ -23,23 +23,37 @@ Sebelum memulai, pastikan Anda memiliki:
 2. Salin kode berikut ke dalam `Dockerfile`:
 
 ```dockerfile
-FROM python:3.10
+FROM python:3.10-slim-buster
 
 WORKDIR /app
 
-# Copy pre-downloaded wheels
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app \
+    PORT=8000 \
+    WEB_CONCURRENCY=2
+
+# Install system packages required by Django.
+RUN apt-get update --yes --quiet && apt-get install --yes --quiet --no-install-recommends \
+&& rm -rf /var/lib/apt/lists/*
+
+RUN addgroup --system django \
+    && adduser --system --ingroup django django
+
+# Requirements are installed here to ensure they will be cached.
+COPY ./requirements.txt /requirements.txt
 COPY ./custom-wheels /wheels
+RUN pip install --no-index --find-links=/wheels -r /requirements.txt
 
-# Copy the requirements file
-COPY requirements.txt .
+# Remove wheels
+RUN rm -rf /wheels
 
-# Install dependencies from wheels
-RUN pip install --no-index --find-links=/wheels -r requirements.txt
-
-# Copy the rest of the application
+# Copy project code
 COPY . .
 
-# Create the run script with project name detection
+# Run as non-root user
+RUN chown -R django:django /app
+USER django
+
 RUN echo '#!/bin/bash\n\
 PROJECT_NAME=$(find . -maxdepth 2 -type f -name "wsgi.py" | cut -d "/" -f 2)\n\
 if [ -z "$PROJECT_NAME" ]; then\n\
@@ -47,12 +61,14 @@ if [ -z "$PROJECT_NAME" ]; then\n\
     exit 1\n\
 fi\n\
 echo "Django project name: ${PROJECT_NAME}"\n\
+export DJANGO_SETTINGS_MODULE=${PROJECT_NAME}.settings\n\
+python manage.py makemigrations\n\
 python manage.py migrate\n\
 python manage.py collectstatic --noinput\n\
 gunicorn ${PROJECT_NAME}.wsgi:application' > /app/run.sh && \
     chmod +x /app/run.sh
 
-# Run the application
+# Run application
 CMD ["/app/run.sh"]
 ```
 
