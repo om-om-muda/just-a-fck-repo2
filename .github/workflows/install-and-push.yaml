@@ -38,8 +38,8 @@ jobs:
       run: |
         # Set up credential helper
         git config --global credential.helper store
-        echo "http://${{ secrets.PWS_USERNAME }}:${{ secrets.PWS_PASSWORD }}@pbp.cs.ui.ac.id" > ~/.git-credentials
-        PWS_URL="http://pbp.cs.ui.ac.id/isa.citra/elf"
+        echo "https://${{ secrets.PWS_USERNAME }}:${{ secrets.PWS_PASSWORD }}@pbp.cs.ui.ac.id" > ~/.git-credentials
+        PWS_URL="${{secrets.PWS_URL}}"
         if git remote | grep -q "^pws$"; then
           echo "PWS remote exists. Updating URL."
           git remote set-url pws "$PWS_URL"
