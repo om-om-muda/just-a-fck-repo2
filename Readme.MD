@@ -1,6 +1,6 @@
 # Django Project CI/CD Setup Guide
 
-Panduan ini akan membantu Anda menyiapkan Continuous Integration dan Continuous Deployment (CI/CD) untuk proyek Django Anda, menggunakan GitHub Actions untuk push otomatis ke PWS (Pengembangan Web Skala Besar).
+Panduan ini akan membantu Anda menyiapkan Continuous Integration dan Continuous Deployment (CI/CD) untuk proyek Django Anda, menggunakan GitHub Actions untuk push otomatis ke PWS (Pacil Web Service).
 
 ## Daftar Isi
 1. [Persiapan Proyek](#persiapan-proyek)
