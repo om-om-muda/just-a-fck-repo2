@@ -139,7 +139,7 @@ jobs:
 ```
 
 4. Pastikan untuk menambahkan secret berikut di pengaturan repositori GitHub Anda:
-   - `PWS_URL`: URL repositori PWS
+   - `PWS_URL`: URL `https://<username>:<projectpassword>@pbp.cs.ui.ac.id/<username>/<projectname>`
 
 ## Menangani Konflik
 
