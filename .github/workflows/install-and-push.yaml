@@ -13,7 +13,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
       with:
-        fetch-depth: 0  # Fetch all history for all branches and tags
+        fetch-depth: 0
 
     - name: Set up Python
       uses: actions/setup-python@v2
@@ -38,7 +38,11 @@ jobs:
 
     - name: Check PWS remote, push, and handle branch
       run: |
-        PWS_URL="http://${{ secrets.PWS_USERNAME }}:${{ secrets.PWS_PASSWORD }}@pbp.cs.ui.ac.id/isa.citra/elf"
+        # Set up credential helper
+        git config --global credential.helper store
+        echo "http://${{ secrets.PWS_USERNAME }}:${{ secrets.PWS_PASSWORD }}@pbp.cs.ui.ac.id" > ~/.git-credentials
+
+        PWS_URL="http://pbp.cs.ui.ac.id/isa.citra/elf"
         if git remote | grep -q "^pws$"; then
           echo "PWS remote exists. Updating URL."
           git remote set-url pws "$PWS_URL"
@@ -62,3 +66,9 @@ jobs:
         git push pws HEAD:master
       env:
         GIT_TERMINAL_PROMPT: 0
+        GIT_ASKPASS: /bin/echo
+        GIT_PASSWORD: ${{ secrets.PWS_PASSWORD }}
+
+    - name: Clean up credentials
+      if: always()
+      run: rm -f ~/.git-credentials
