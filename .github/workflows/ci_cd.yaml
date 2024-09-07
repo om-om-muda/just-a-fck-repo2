@@ -1,0 +1,116 @@
+name: Install Dependencies and Handle Conflicts
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install PyGithub
+
+    - name: Create custom-wheels directory
+      run: mkdir -p ./custom-wheels
+
+    - name: Download wheels
+      run: pip download -r requirements.txt -d ./custom-wheels
+
+    - name: Set up Git
+      run: |
+        git config --global user.name "${{ secrets.GH_USERNAME }}"
+        git config --global user.email "${{secrets.GH_EMAIL}}"
+
+    - name: Check PWS remote, pull, and handle conflicts
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        # Set up credential helper
+        git config --global credential.helper store
+        echo "https://${{ secrets.PWS_USERNAME }}:${{ secrets.PWS_PASSWORD }}@pbp.cs.ui.ac.id" > ~/.git-credentials
+        PWS_URL="${{secrets.PWS_URL}}"
+        if git remote | grep -q "^pws$"; then
+          echo "PWS remote exists. Updating URL."
+          git remote set-url pws "$PWS_URL"
+        else
+          echo "PWS remote does not exist. Adding it."
+          git remote add pws "$PWS_URL"
+        fi
+        
+        git add .
+        git commit -m "Add installed dependencies and custom wheels" || echo "No changes to commit"
+        
+        # Check if master branch exists locally
+        if ! git show-ref --verify --quiet refs/heads/master; then
+          echo "Creating master branch"
+          git branch master
+        fi
+        
+        # Switch to master branch
+        git checkout master
+        
+        # Try to pull
+        if ! git pull pws master --no-rebase; then
+          echo "Pull failed, conflicts detected."
+          
+          # Create a new branch for conflicts
+          conflict_branch="resolve-conflicts-$(date +%Y%m%d-%H%M%S)"
+          git checkout -b $conflict_branch
+          
+          # Stage all files, including those with conflicts
+          git add .
+          
+          # Commit the conflicting state
+          git commit -m "Conflicting state for manual resolution"
+          
+          # Push the conflict branch to GitHub
+          git push origin $conflict_branch
+          
+          # Create a Pull Request using PyGithub
+          python - <<EOF
+          import os
+          from github import Github
+
+          g = Github(os.environ['GITHUB_TOKEN'])
+          repo = g.get_repo(os.environ['GITHUB_REPOSITORY'])
+
+          pr = repo.create_pull(
+              title="Resolve conflicts with PWS",
+              body="Conflicts were detected when trying to merge with PWS. Please resolve these conflicts manually.",
+              head=f"{conflict_branch}",
+              base="master"
+          )
+
+          print(f"Pull Request created: {pr.html_url}")
+          EOF
+          
+          echo "Conflicts detected. A new branch '$conflict_branch' has been created and a Pull Request has been opened for manual resolution."
+          exit 1
+        fi
+        
+        # If we got here, pull was successful
+        echo "Pull successful, pushing changes"
+        if ! git push pws master; then
+          echo "Push failed. Please check the error message above and resolve any issues manually."
+          exit 1
+        fi
+        echo "Push successful"
+
+    - name: Clean up credentials
+      if: always()
+      run: rm -f ~/.git-credentials
