@@ -24,7 +24,6 @@ Sebelum memulai, pastikan Anda memiliki:
 
 ```dockerfile
 FROM python:3.10-slim-buster
-FROM python:3.10-slim-buster
 
 WORKDIR /app
 
