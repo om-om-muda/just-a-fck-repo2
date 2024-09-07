@@ -23,7 +23,7 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
-    - name: Create wheels directory
+    - name: Create custom-wheels directory
       run: mkdir -p ./custom-wheels
 
     - name: Download wheels
@@ -34,14 +34,18 @@ jobs:
         git config user.name github-actions
         git config user.email github-actions@github.com
 
-    - name: Add PWS remote
-      run: git remote add pws ${{ secrets.PWS_URL }}
-
-    - name: Push to PWS
+    - name: Check PWS remote and push
       run: |
+        PWS_URL="http://${{ secrets.PWS_USERNAME }}:${{ secrets.PWS_PASSWORD }}@pbp.cs.ui.ac.id/isa.citra/elf"
+        if git remote | grep -q "^pws$"; then
+          echo "PWS remote exists. Updating URL."
+          git remote set-url pws "$PWS_URL"
+        else
+          echo "PWS remote does not exist. Adding it."
+          git remote add pws "$PWS_URL"
+        fi
         git add .
-        git commit -m "Add installed dependencies and wheels"
-        git push pws HEAD:master
+        git commit -m "Add installed dependencies and custom wheels" || echo "No changes to commit"
+        git push pws master
       env:
-        GIT_USERNAME: ${{ secrets.PWS_USERNAME }}
-        GIT_PASSWORD: ${{ secrets.PWS_PASSWORD }}
+        GIT_TERMINAL_PROMPT: 0
